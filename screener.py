@@ -121,7 +121,7 @@ if __name__ == '__main__':
     # BAR MANAGER START --------------------------------------------
     bar_store = Screener(API_KEY, SECRET_KEY)
 
-    # bar_store.set_time_override("2022-04-01T19:50:00+00:00")
+    bar_store.set_time_override("2022-04-01T19:50:00+00:00")
 
     bar_store.initialize()
 

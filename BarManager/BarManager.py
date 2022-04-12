@@ -1,12 +1,8 @@
 import datetime
 import math
-import statistics
 import threading
 import time
-from concurrent.futures.process import ProcessPoolExecutor
-import dateutil
 import alpaca_trade_api
-import numpy
 import pandas
 from alpaca_trade_api import Stream
 from apscheduler.schedulers.background import BackgroundScheduler

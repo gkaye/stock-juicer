@@ -32,7 +32,7 @@ def create_graph(i):
                 html.H6('📌', id=f'pin-button_{i}', n_clicks=0, style={'cursor': 'pointer'})
             ], style={'display': 'inline-flex', 'justifyContent': 'space-between', 'alignItems': 'flex-end', 'margin': '3px 7px -4px 7px'}),
             html.Div(dcc.Graph(id=f'graph_{i}', responsive=True, config=graph_config, style=graph_style), style={})
-        ], style={'display': 'inline-flex', 'flexDirection': 'column', 'borderStyle': 'solid', 'borderRadius': '12px', 'margin': '2px', 'overflow': 'hidden'})
+        ], id=f'container_{i}', style={'display': 'inline-flex', 'flexDirection': 'column', 'borderStyle': 'solid', 'borderRadius': '12px', 'margin': '2px', 'overflow': 'hidden'})
 
 
 def create_graphs(n):
@@ -74,6 +74,21 @@ def update_pin(*n_clicks):
 
     while len(ret) < ttl_live_charts:
         ret.append('📌')
+
+    return ret
+
+
+
+@app.callback([Output(f'container_{i}', 'hidden') for i in range(ttl_live_charts)],
+              [Input('chart-interval-component', 'n_intervals')])
+def update_hidden(n_intervals):
+    ret = []
+    if bar_manager is not None:
+        for symbol in bar_manager.get_active_symbols():
+            ret.append(False)
+
+    while len(ret) < ttl_live_charts:
+        ret.append(True)
 
     return ret
 
@@ -138,7 +153,7 @@ def update_graph(n_intervals):
 
 
 if __name__ == '__main__':
-    historical_mode = False
+    historical_mode = True
     historical_time = "2022-04-08T19:00:00+00:00"
 
     bar_manager = None
