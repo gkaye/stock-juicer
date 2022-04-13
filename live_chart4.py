@@ -35,9 +35,11 @@ def create_graph(i):
                 id=f'volume-acceleration_{i}',
                 label="",
                 value=1,
+                max=10,
                 size=425,
-                color={"gradient": True, "ranges": {"gray": [0, 3], "yellow": [3, 6], "red": [6, 10]}},
-            ), style={'height': '15px'})
+                color={"gradient": True, "ranges": {"gray": [0, 4], "orange": [4, 7], "red": [7, 10]}},
+                style={'opacity': '0.75', 'background-color': 'white'}
+            ), style={'height': '15px', 'margin': '-1px', 'background-color': 'white'})
         ], id=f'container_{i}', style={'display': 'inline-flex', 'flexDirection': 'column', 'borderStyle': 'solid', 'borderRadius': '12px', 'margin': '2px', 'overflow': 'hidden'})
 
 
