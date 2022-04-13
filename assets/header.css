@@ -11034,8 +11034,4 @@ fieldset:disabled .btn {
 	.d-print-none {
 		display: none!important
 	}
-
-	.rvol_bar > div > div {
-        background-color: #ffffff !important;
-    }
 }

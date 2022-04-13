@@ -7,7 +7,6 @@ import threading
 from BarManager.BarManager import BarManager
 from BarManager.Screener import Screener
 import dash
-import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 
@@ -18,7 +17,7 @@ app = Dash(__name__, title='Juicer', update_title=None)
 app.config.suppress_callback_exceptions = True
 
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
-graph_style = {"height": "330px", 'minWidth': '425px', 'maxWidth': '600px'}
+graph_style = {"height": "320px", 'minWidth': '425px', 'maxWidth': '600px'}
 
 ttl_live_charts = 15
 
@@ -39,7 +38,7 @@ def create_graph(i):
                 max=10,
                 size=425,
                 color={"gradient": True, "ranges": {"gray": [0, 4], "orange": [4, 7], "red": [7, 10]}},
-                style={'opacity': '0.75', 'background-color': 'white'}
+                style={'opacity': '0.75', 'background-color': 'rgb(230, 230, 230)'}
             ), style={'height': '15px', 'margin': '-1px', 'background-color': 'white'})
         ], id=f'container_{i}', style={'display': 'inline-flex', 'flexDirection': 'column', 'borderStyle': 'solid', 'borderRadius': '12px', 'margin': '2px', 'overflow': 'hidden'})
 
@@ -81,7 +80,7 @@ raw_layout = html.Div([
 
 
 app.layout = html.Div([
-    dcc.Tabs(id="tabs-example-graph", value='tab-1-example-graph', children=[
+    dcc.Tabs(id="tabs-example-graph", value='tab-2', children=[
         dcc.Tab(label='Graphs', value='tab-1'),
         dcc.Tab(label='Raw Output', value='tab-2'),
     ]),
