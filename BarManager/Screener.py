@@ -204,7 +204,6 @@ class Screener:
         return 0.0
 
     def generate_pretty_output(self):
-        results_length = 30
         prioritized_columns = ['symbol', 'linearity.40.6', 'liquidity.100.15.10', 'volume_MIN.15', 'spread_acr_ratio']
 
         series_list = []
@@ -221,7 +220,7 @@ class Screener:
             print('No results found')
         else:
             df.sort_values(by=['linearity.40.6', 'liquidity.100.15.10', 'volume_MIN.15'], ascending=[False, True, False], inplace=True)
-            df = df[:results_length]
+            df = df
 
             # Downselect and reorder columns
             leftover_columns = [col for col in list(df.columns.values) if col not in prioritized_columns]

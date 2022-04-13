@@ -9,11 +9,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 class BarManager:
-    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=15, data_feed='sip', max_bars=100, aggregation_period_minutes=2, pinned_symbols=[]):
+    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=15, data_feed='sip', max_bars=100, aggregation_period_minutes=2, pinned_symbols=[],
+                 rvol_sample_window_seconds=60, rvol_multiplier=2):
         self.api_key = api_key
         self.api_secret = api_secret
         self.data_feed = data_feed
         self.symbol_to_bars = {}
+        self.symbol_to_trade_timestamps = {}
         self.symbols = []
         self.max_bars = max_bars
         self.num_active_charts = num_active_charts
@@ -23,12 +25,45 @@ class BarManager:
         self.get_time_override_function = None
         self.aggregation_period_minutes = aggregation_period_minutes
         self.pinned_symbols = pinned_symbols
+        self.rvol_sample_window_seconds = rvol_sample_window_seconds
+        self.rvol_multiplier = rvol_multiplier
 
         self.alpaca = alpaca_trade_api.REST(api_key, api_secret)
         self.stream = Stream(api_key, api_secret, data_feed=data_feed)
 
     def set_get_time_override_function(self, get_time_override_function):
         self.get_time_override_function = get_time_override_function
+
+    def get_volume_acceleration(self, symbol):
+        if symbol not in self.symbol_to_trade_timestamps:
+            return 0
+
+        timestamps = self.symbol_to_trade_timestamps[symbol]
+
+        current_time = time.time()
+        samples_large_window = self.timestamps_count_within(current_time, timestamps, self.rvol_sample_window_seconds)
+        samples_small_window = self.timestamps_count_within(current_time, timestamps, self.rvol_sample_window_seconds / 2)
+        samples_small_window_2 = samples_large_window - samples_small_window
+
+        if samples_small_window_2 == 0 or samples_small_window == 0 or samples_large_window == 0:
+            return 0
+
+        rvol = (samples_small_window / samples_small_window_2) - 1
+
+        print(f'{symbol} rvol is: {rvol}')
+        return rvol * self.rvol_multiplier
+
+    @staticmethod
+    def timestamps_count_within(current_time, timestamps_list, within_seconds):
+        minimum_time = current_time - within_seconds
+
+        count = 0
+        for ts in timestamps_list:
+            if ts > minimum_time:
+                count += 1
+
+        return count
+
 
     def get_bars(self, symbol):
         if symbol in self.symbol_to_bars:
@@ -150,6 +185,12 @@ class BarManager:
         return dt.replace(minute=nearest_candle_minute)
 
     async def trades_callback(self, t):
+        # Manage symbol_to_trade_timestamps
+        if t.symbol not in self.symbol_to_trade_timestamps:
+            self.symbol_to_trade_timestamps[t.symbol] = []
+        self.symbol_to_trade_timestamps[t.symbol].append(t.timestamp.timestamp())
+
+
         if t.symbol not in self.symbol_to_bars:
             self.initialize_historical_bars(t.symbol)
 

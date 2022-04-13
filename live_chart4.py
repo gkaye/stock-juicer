@@ -20,7 +20,7 @@ app.config.suppress_callback_exceptions = True
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
 graph_style = {"height": "330px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-ttl_live_charts = 15
+ttl_live_charts = 3
 
 
 def create_graph(i):
@@ -45,7 +45,7 @@ def create_graphs(n):
     return [create_graph(i) for i in range(n)]
 
 
-graphs_layout = html.Div([
+app.layout = html.Div([
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
@@ -58,66 +58,6 @@ graphs_layout = html.Div([
         n_intervals=0
     ),
 ], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
-
-raw_layout = html.Div([
-    html.H5(id='screener-info-text-1'),
-    html.H5(id='screener-info-text-2'),
-    dash_table.DataTable(id='screener-table'),
-    dcc.Interval(
-        id='screener-table-interval-component',
-        interval=1 * 1000,
-        n_intervals=0
-    ),
-    dcc.Interval(
-        id='screener-info-text-interval-component',
-        interval=1 * 1000,
-        n_intervals=0
-    )
-], style={'padding': '10px'})
-
-
-
-app.layout = html.Div([
-    dcc.Tabs(id="tabs-example-graph", value='tab-1-example-graph', children=[
-        dcc.Tab(label='Graphs', value='tab-1'),
-        dcc.Tab(label='Raw Output', value='tab-2'),
-    ]),
-    html.Div(id='tabs-content-example-graph')
-])
-
-
-@app.callback(Output('tabs-content-example-graph', 'children'),
-              Input('tabs-example-graph', 'value'))
-def render_content(tab):
-    if tab == 'tab-1':
-        return graphs_layout
-    elif tab == 'tab-2':
-        return raw_layout
-
-
-@app.callback(Output('screener-table', 'data'),
-              Output('screener-table', 'columns'),
-              Input('screener-table-interval-component', 'n_intervals'))
-def update_metrics(n):
-    return screener.pretty_output.to_dict('records'), [{"name": i, "id": i} for i in screener.pretty_output.columns]
-
-
-@app.callback(Output('screener-info-text-1', 'children'),
-              Input('screener-info-text-interval-component', 'n_intervals'))
-def update_metrics(n):
-    last_update_time = screener.pretty_output_last_update_time
-    if not last_update_time:
-        elapsed_string = 'Never updated'
-    else:
-        elapsed_string = f'{(time.time() - screener.pretty_output_last_update_time):.0f} seconds ago'
-
-    return f'Last update time: {elapsed_string}'
-
-
-@app.callback(Output('screener-info-text-2', 'children'),
-              Input('screener-info-text-interval-component', 'n_intervals'))
-def update_metrics(n):
-    return f'Number of Records: {screener.pretty_output.shape[0]}'
 
 
 @app.callback([Output(f'pin-button_{i}', 'children') for i in range(ttl_live_charts)],
@@ -179,6 +119,7 @@ def update_volume_acceleration(n_intervals):
     ret = []
     if bar_manager is not None:
         for symbol in bar_manager.get_active_symbols():
+
             ret.append(bar_manager.get_volume_acceleration(symbol))
 
     while len(ret) < ttl_live_charts:
@@ -233,19 +174,10 @@ def update_graph(n_intervals):
 
 
 if __name__ == '__main__':
-    historical_mode = False
-    historical_time = "2022-04-08T19:00:00+00:00"
-
     bar_manager = None
     threading.Thread(target=lambda: app.run_server(debug=True, use_reloader=False)).start()
 
-    screener = Screener(API_KEY, SECRET_KEY, should_filter_by_spread=not historical_mode)
-    if historical_mode:
-        screener.set_time_override(historical_time)
-    screener.initialize()
-
-    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=ttl_live_charts)
-    bar_manager.set_symbols(screener.output_symbols)
-    if historical_mode:
-        bar_manager.set_get_time_override_function(lambda: screener.time_override)
+    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=3)
+    bar_manager.set_symbols(['SPY', 'QQQ', 'TSLA'])
     bar_manager.initialize()
+
