@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 class BarManager:
     def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=15, data_feed='sip', max_bars=100, aggregation_period_minutes=2, pinned_symbols=[],
-                 rvol_sample_window_seconds=60, rvol_multiplier=2):
+                 rvol_sample_window_seconds=60, rvol_multiplier=1):
         self.api_key = api_key
         self.api_secret = api_secret
         self.data_feed = data_feed
@@ -34,6 +34,14 @@ class BarManager:
     def set_get_time_override_function(self, get_time_override_function):
         self.get_time_override_function = get_time_override_function
 
+    def prune_symbol_to_trade_timestamps(self, symbol):
+        buffer_seconds = 15
+
+        for symbol in self.symbol_to_trade_timestamps:
+            timestamps = self.symbol_to_trade_timestamps[symbol]
+            minimum_time = time.time() - self.rvol_sample_window_seconds - buffer_seconds
+            self.symbol_to_trade_timestamps[symbol] = [ts for ts in timestamps if ts > minimum_time]
+
     def get_volume_acceleration(self, symbol):
         if symbol not in self.symbol_to_trade_timestamps:
             return 0
@@ -48,9 +56,8 @@ class BarManager:
         if samples_small_window_2 == 0 or samples_small_window == 0 or samples_large_window == 0:
             return 0
 
-        rvol = (samples_small_window / samples_small_window_2) - 1
+        rvol = (samples_small_window / samples_small_window_2)
 
-        print(f'{symbol} rvol is: {rvol}')
         return rvol * self.rvol_multiplier
 
     @staticmethod
@@ -106,6 +113,7 @@ class BarManager:
         symbols_for_deletion = [symbol for symbol in self.symbol_to_bars if symbol not in self.subscription_symbols]
         for symbol in symbols_for_deletion:
             self.symbol_to_bars.pop(symbol, None)
+            self.symbol_to_trade_timestamps.pop(symbol, None)
 
     def maybe_reinitialize_job(self):
         stream_stop_wait_time = 0.1
@@ -200,6 +208,8 @@ class BarManager:
         ts = self.nearest_candle(ts)
 
         if ts not in self.symbol_to_bars[t.symbol].index:
+            self.prune_symbol_to_trade_timestamps(t.symbol)
+
             # Fill in data gaps with historical api
             self.update_historical_bars(t.symbol, 3 * self.aggregation_period_minutes)
 

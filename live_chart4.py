@@ -33,6 +33,7 @@ def create_graph(i):
             html.Div(dcc.Graph(id=f'graph_{i}', responsive=True, config=graph_config, style=graph_style), style={}),
             html.Div(daq.GraduatedBar(
                 id=f'volume-acceleration_{i}',
+                className='rvol_bar',
                 label="",
                 value=1,
                 max=10,

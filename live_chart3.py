@@ -14,7 +14,7 @@ import dash_daq as daq
 API_KEY = 'AKCBVDALZTXXE0NJ7LMV'
 SECRET_KEY = 'OgCPIyKsZ9g1iLrmU89uKcWUCPW59E8Vrc6bGzwz'
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], title='Juicer', update_title=None)
+app = Dash(__name__, title='Juicer', update_title=None)
 app.config.suppress_callback_exceptions = True
 
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
@@ -33,6 +33,7 @@ def create_graph(i):
             html.Div(dcc.Graph(id=f'graph_{i}', responsive=True, config=graph_config, style=graph_style), style={}),
             html.Div(daq.GraduatedBar(
                 id=f'volume-acceleration_{i}',
+                className='rvol_bar',
                 label="",
                 value=1,
                 max=10,
