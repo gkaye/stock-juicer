@@ -7,20 +7,19 @@ import threading
 from BarManager.BarManager import BarManager
 from BarManager.Screener import Screener
 import dash
-import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 
 API_KEY = 'AKCBVDALZTXXE0NJ7LMV'
 SECRET_KEY = 'OgCPIyKsZ9g1iLrmU89uKcWUCPW59E8Vrc6bGzwz'
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], title='Juicer', update_title=None)
+app = Dash(__name__, title='Juicer', update_title=None)
 app.config.suppress_callback_exceptions = True
 
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
-graph_style = {"height": "330px", 'minWidth': '425px', 'maxWidth': '600px'}
+graph_style = {"height": "320px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-ttl_live_charts = 3
+ttl_live_charts = 30
 
 
 def create_graph(i):
@@ -39,13 +38,45 @@ def create_graph(i):
                 max=10,
                 size=425,
                 color={"gradient": True, "ranges": {"gray": [0, 4], "orange": [4, 7], "red": [7, 10]}},
-                style={'opacity': '0.75', 'background-color': 'white'}
+                style={'opacity': '0.75', 'background-color': 'rgb(230, 230, 230)'}
             ), style={'height': '15px', 'margin': '-1px', 'background-color': 'white'})
         ], id=f'container_{i}', style={'display': 'inline-flex', 'flexDirection': 'column', 'borderStyle': 'solid', 'borderRadius': '12px', 'margin': '2px', 'overflow': 'hidden'})
 
 
 def create_graphs(n):
     return [create_graph(i) for i in range(n)]
+
+
+graphs_layout = html.Div([
+    *create_graphs(ttl_live_charts),
+    dcc.Interval(
+        id='chart-interval-component',
+        interval=400,
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id='pin-interval-component',
+        interval=1000,
+        n_intervals=0
+    ),
+], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
+
+raw_layout = html.Div([
+    html.H5(id='screener-info-text-1'),
+    html.H5(id='screener-info-text-2'),
+    dash_table.DataTable(id='screener-table'),
+    dcc.Interval(
+        id='screener-table-interval-component',
+        interval=1 * 1000,
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id='screener-info-text-interval-component',
+        interval=1 * 1000,
+        n_intervals=0
+    )
+], style={'padding': '10px'})
+
 
 
 app.layout = html.Div([
@@ -61,6 +92,15 @@ app.layout = html.Div([
         n_intervals=0
     ),
 ], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
+
+
+@app.callback(Output('tabs-content-example-graph', 'children'),
+              Input('tabs', 'value'))
+def render_content(tab):
+    if tab == 'tab-1':
+        return graphs_layout
+    elif tab == 'tab-2':
+        return raw_layout
 
 
 @app.callback([Output(f'pin-button_{i}', 'children') for i in range(ttl_live_charts)],
@@ -122,7 +162,6 @@ def update_volume_acceleration(n_intervals):
     ret = []
     if bar_manager is not None:
         for symbol in bar_manager.get_active_symbols():
-
             ret.append(bar_manager.get_volume_acceleration(symbol))
 
     while len(ret) < ttl_live_charts:
