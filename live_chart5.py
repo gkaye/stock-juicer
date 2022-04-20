@@ -1,5 +1,6 @@
-import datetime
+import random
 import time
+import datetime
 
 from dash import Dash, dash_table, dcc, html, Output, Input
 import threading
@@ -8,6 +9,7 @@ from BarManager.BarManager import BarManager
 from BarManager.Screener import Screener
 import dash
 import dash_daq as daq
+
 
 
 API_KEY = 'AKCBVDALZTXXE0NJ7LMV'
@@ -25,7 +27,7 @@ sub_graph_style = {"height": "75px", 'minWidth': '425px', 'maxWidth': '600px'}
 sub_graph_2_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
 sub_graph_2_style = {"height": "75px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-ttl_live_charts = 30
+ttl_live_charts = 10
 
 
 def create_graph(i):
@@ -59,7 +61,12 @@ graphs_layout = html.Div([
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
-        interval=400,
+        interval=1000,
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id='sub-chart-interval-component',
+        interval=2500,
         n_intervals=0
     ),
     dcc.Interval(
@@ -88,18 +95,12 @@ raw_layout = html.Div([
 
 
 app.layout = html.Div([
-    *create_graphs(ttl_live_charts),
-    dcc.Interval(
-        id='chart-interval-component',
-        interval=2000,
-        n_intervals=0
-    ),
-    dcc.Interval(
-        id='pin-interval-component',
-        interval=1000,
-        n_intervals=0
-    ),
-], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
+    dcc.Tabs(id="tabs", value='tab-2', children=[
+        dcc.Tab(label='Graphs', value='tab-1'),
+        dcc.Tab(label='Raw Output', value='tab-2'),
+    ]),
+    html.Div(id='tabs-content-example-graph')
+])
 
 
 @app.callback(Output('tabs-content-example-graph', 'children'),
@@ -109,6 +110,31 @@ def render_content(tab):
         return graphs_layout
     elif tab == 'tab-2':
         return raw_layout
+
+
+@app.callback(Output('screener-table', 'data'),
+              Output('screener-table', 'columns'),
+              Input('screener-table-interval-component', 'n_intervals'))
+def update_metrics(n):
+    return screener.pretty_output.to_dict('records'), [{"name": i, "id": i} for i in screener.pretty_output.columns]
+
+
+@app.callback(Output('screener-info-text-1', 'children'),
+              Input('screener-info-text-interval-component', 'n_intervals'))
+def update_metrics(n):
+    last_update_time = screener.pretty_output_last_update_time
+    if not last_update_time:
+        elapsed_string = 'Never updated'
+    else:
+        elapsed_string = f'{(time.time() - screener.pretty_output_last_update_time):.0f} seconds ago'
+
+    return f'Last update time: {elapsed_string}'
+
+
+@app.callback(Output('screener-info-text-2', 'children'),
+              Input('screener-info-text-interval-component', 'n_intervals'))
+def update_metrics(n):
+    return f'Number of Records: {screener.pretty_output.shape[0]}'
 
 
 @app.callback([Output(f'pin-button_{i}', 'children') for i in range(ttl_live_charts)],
@@ -184,6 +210,7 @@ def update_graph(n_intervals):
     ret = []
     if bar_manager is not None:
         for symbol in bar_manager.get_active_symbols():
+
             ret.append({
                 'data': [{
                     'open': bar_manager.get_bars(symbol)['open'],
@@ -223,7 +250,7 @@ def update_graph(n_intervals):
 
 
 @app.callback([Output(f'sub_graph_{i}', 'figure') for i in range(ttl_live_charts)],
-              [Input('chart-interval-component', 'n_intervals')])
+              [Input('sub-chart-interval-component', 'n_intervals')])
 def update_sub_graph(n_intervals):
     start_time = time.time()
 
@@ -272,7 +299,7 @@ def update_sub_graph(n_intervals):
 
 
 @app.callback([Output(f'sub_graph_2_{i}', 'figure') for i in range(ttl_live_charts)],
-              [Input('chart-interval-component', 'n_intervals')])
+              [Input('sub-chart-interval-component', 'n_intervals')])
 def update_sub_graph_2(n_intervals):
     start_time = time.time()
 
@@ -321,10 +348,19 @@ def update_sub_graph_2(n_intervals):
 
 
 if __name__ == '__main__':
+    historical_mode = False
+    historical_time = "2022-04-08T19:00:00+00:00"
+
     bar_manager = None
     threading.Thread(target=lambda: app.run_server(debug=True, use_reloader=False)).start()
 
-    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=18)
-    bar_manager.set_symbols(['SPY', 'QQQ', 'TSLA', 'COP', 'XOP', 'EQT', 'MS', 'FNGU', 'HAL', 'PYPL', 'MDT', 'IWM', 'CVX', 'LQD', 'QQQ', 'MSFT', 'XLY', 'WBD'])
-    bar_manager.initialize()
+    screener = Screener(API_KEY, SECRET_KEY, should_filter_by_spread=not historical_mode)
+    if historical_mode:
+        screener.set_time_override(historical_time)
+    screener.initialize()
 
+    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=ttl_live_charts, aggregation_period_minutes=1)
+    bar_manager.set_symbols(screener.output_symbols)
+    if historical_mode:
+        bar_manager.set_get_time_override_function(lambda: screener.time_override)
+    bar_manager.initialize()

@@ -19,7 +19,7 @@ app.config.suppress_callback_exceptions = True
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
 graph_style = {"height": "320px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-ttl_live_charts = 15
+ttl_live_charts = 30
 
 
 def create_graph(i):
@@ -51,7 +51,7 @@ graphs_layout = html.Div([
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
-        interval=200,
+        interval=400,
         n_intervals=0
     ),
     dcc.Interval(
@@ -80,7 +80,7 @@ raw_layout = html.Div([
 
 
 app.layout = html.Div([
-    dcc.Tabs(id="tabs-example-graph", value='tab-2', children=[
+    dcc.Tabs(id="tabs", value='tab-2', children=[
         dcc.Tab(label='Graphs', value='tab-1'),
         dcc.Tab(label='Raw Output', value='tab-2'),
     ]),
@@ -89,7 +89,7 @@ app.layout = html.Div([
 
 
 @app.callback(Output('tabs-content-example-graph', 'children'),
-              Input('tabs-example-graph', 'value'))
+              Input('tabs', 'value'))
 def render_content(tab):
     if tab == 'tab-1':
         return graphs_layout
@@ -246,7 +246,7 @@ if __name__ == '__main__':
         screener.set_time_override(historical_time)
     screener.initialize()
 
-    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=ttl_live_charts)
+    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY', 'QQQ'], num_active_charts=ttl_live_charts)
     bar_manager.set_symbols(screener.output_symbols)
     if historical_mode:
         bar_manager.set_get_time_override_function(lambda: screener.time_override)
