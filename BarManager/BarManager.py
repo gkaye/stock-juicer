@@ -35,6 +35,11 @@ class BarManager:
         self.stream = Stream(api_key, api_secret, data_feed=data_feed)
 
 
+    def reset_subgraphs(self):
+        self.symbol_to_ticker_momentum = {}
+        self.symbol_to_friction = {}
+
+
     def set_get_time_override_function(self, get_time_override_function):
         self.get_time_override_function = get_time_override_function
 
@@ -48,7 +53,7 @@ class BarManager:
             self.symbol_to_trade_timestamps[symbol] = [ts for ts in timestamps if ts > minimum_time]
 
 
-    def get_friction(self, symbol, period='30s'):
+    def get_friction(self, symbol, period='10s'):
         start_time = time.time()
         if symbol not in self.symbol_to_friction:
             return []
@@ -65,7 +70,7 @@ class BarManager:
         return dataframe
 
 
-    def get_ticker_momentum(self, symbol, period='30s'):
+    def get_ticker_momentum(self, symbol, period='15s'):
         start_time = time.time()
         if symbol not in self.symbol_to_ticker_momentum:
             return []

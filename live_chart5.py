@@ -77,6 +77,8 @@ graphs_layout = html.Div([
 ], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
 
 raw_layout = html.Div([
+    html.Button('Reset', id='reset-button', n_clicks=0),
+    html.Div(id='dummy'),
     html.H5(id='screener-info-text-1'),
     html.H5(id='screener-info-text-2'),
     dash_table.DataTable(id='screener-table'),
@@ -99,8 +101,18 @@ app.layout = html.Div([
         dcc.Tab(label='Graphs', value='tab-1'),
         dcc.Tab(label='Raw Output', value='tab-2'),
     ]),
-    html.Div(id='tabs-content-example-graph')
+    html.Div(id='tabs-content-example-graph'),
 ])
+
+
+@app.callback(
+    Output('dummy', 'children'),
+    Input('reset-button', 'n_clicks'),
+)
+def reset_button(n_clicks):
+    if bar_manager:
+        bar_manager.reset_subgraphs()
+    return ""
 
 
 @app.callback(Output('tabs-content-example-graph', 'children'),
