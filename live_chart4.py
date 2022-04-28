@@ -55,39 +55,9 @@ def create_graphs(n):
     return [create_graph(i) for i in range(n)]
 
 
-graphs_layout = html.Div([
-    *create_graphs(ttl_live_charts),
-    dcc.Interval(
-        id='chart-interval-component',
-        interval=400,
-        n_intervals=0
-    ),
-    dcc.Interval(
-        id='pin-interval-component',
-        interval=1000,
-        n_intervals=0
-    ),
-], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
-
-raw_layout = html.Div([
-    html.H5(id='screener-info-text-1'),
-    html.H5(id='screener-info-text-2'),
-    dash_table.DataTable(id='screener-table'),
-    dcc.Interval(
-        id='screener-table-interval-component',
-        interval=1 * 1000,
-        n_intervals=0
-    ),
-    dcc.Interval(
-        id='screener-info-text-interval-component',
-        interval=1 * 1000,
-        n_intervals=0
-    )
-], style={'padding': '10px'})
-
-
-
 app.layout = html.Div([
+    html.Button('Reset', id='reset-button', n_clicks=0),
+    html.Div(id='dummy'),
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
@@ -100,15 +70,6 @@ app.layout = html.Div([
         n_intervals=0
     ),
 ], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
-
-
-@app.callback(Output('tabs-content-example-graph', 'children'),
-              Input('tabs', 'value'))
-def render_content(tab):
-    if tab == 'tab-1':
-        return graphs_layout
-    elif tab == 'tab-2':
-        return raw_layout
 
 
 @app.callback([Output(f'pin-button_{i}', 'children') for i in range(ttl_live_charts)],
@@ -320,11 +281,21 @@ def update_sub_graph_2(n_intervals):
     return ret
 
 
+@app.callback(
+    Output('dummy', 'children'),
+    Input('reset-button', 'n_clicks'),
+)
+def reset_button(n_clicks):
+    if bar_manager:
+        bar_manager.reset_subgraphs()
+    return ""
+
+
 if __name__ == '__main__':
     bar_manager = None
     threading.Thread(target=lambda: app.run_server(debug=True, use_reloader=False)).start()
 
-    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=18)
-    bar_manager.set_symbols(['SPY', 'QQQ', 'TSLA', 'COP', 'XOP', 'EQT', 'MS', 'FNGU', 'HAL', 'PYPL', 'MDT', 'IWM', 'CVX', 'LQD', 'QQQ', 'MSFT', 'XLY', 'WBD'])
+    bar_manager = BarManager(API_KEY, SECRET_KEY, num_active_charts=5, aggregation_period_minutes=1)
+    bar_manager.set_symbols(['SPY', 'TSLA', 'CCJ', 'FB', 'RBLX', 'MOS'])
     bar_manager.initialize()
 

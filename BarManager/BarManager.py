@@ -127,7 +127,8 @@ class BarManager:
 
     def set_symbols(self, symbols):
         self.symbols = symbols
-        print(f'Symbols set to: {self.symbols}')
+        just_symbols = [row['symbol'] for row in self.symbols]
+        print(f'Symbols set to: {just_symbols}')
 
 
     def toggle_pinned(self, symbol):
@@ -136,16 +137,20 @@ class BarManager:
         else:
             self.pinned_symbols.append(symbol)
 
+    def get_metadata(self, symbol):
+        for row in self.symbols:
+            if row['symbol'] == symbol:
+                return row
 
     def get_active_symbols(self):
-        unpinned_symbols_subset = [x for x in self.symbols if x not in self.pinned_symbols]
+        unpinned_symbols_subset = [x['symbol'] for x in self.symbols if x['symbol'] not in self.pinned_symbols]
 
         active_symbols = (self.pinned_symbols + unpinned_symbols_subset)[:self.num_active_charts]
         return active_symbols
 
 
     def generate_subscription_symbols(self):
-        unpinned_symbols_subset = [x for x in self.symbols if x not in self.pinned_symbols]
+        unpinned_symbols_subset = [x['symbol'] for x in self.symbols if x['symbol'] not in self.pinned_symbols]
         self.subscription_symbols = (self.pinned_symbols + unpinned_symbols_subset)[:(self.num_active_charts + self.symbols_buffer)]
         print(f'Subscribing to symbols: {self.subscription_symbols}')
 
@@ -278,37 +283,37 @@ class BarManager:
         self.symbol_to_quotes[q.symbol] = self.symbol_to_quotes[q.symbol][-max_quotes:]
 
 
-        # Friction
-        spread = q.ask_price - q.bid_price
-        if spread <= 0.0:
-            # print(f"Retrieved 0 or negative spread for {t.symbol}")
-            return
-
-        if q.symbol not in self.symbol_to_friction:
-            self.symbol_to_friction[q.symbol] = []
-
-        ask_size = q.ask_size
-        bid_size = q.bid_size
-        friction = ((bid_size / (ask_size + bid_size)) - 0.5) * 2.0
-
-        container = {'index': q.timestamp, 'friction': friction}
-        self.symbol_to_friction[q.symbol].append(container)
-
-        # Prune
-        max_friction_length = 20000
-        max_time_minutes = 3
-        check_time_minutes = 4
-        self.symbol_to_friction[q.symbol] = self.symbol_to_friction[q.symbol][-max_friction_length:]
-
-        current_time = datetime.datetime.now(datetime.timezone.utc)
-        max_time = current_time - datetime.timedelta(minutes=max_time_minutes)
-        check_time = current_time - datetime.timedelta(minutes=check_time_minutes)
-
-        if self.symbol_to_friction[q.symbol][0]['index'] < check_time:
-            print(f'Friction prune initiated for {q.symbol}...')
-            reduced_set = [r for r in self.symbol_to_friction[q.symbol] if r['index'] > max_time]
-            print(f'Friction prune results for {q.symbol}: {len(self.symbol_to_friction[q.symbol])} -> {len(reduced_set)}')
-            self.symbol_to_friction[q.symbol] = reduced_set
+        # # Friction
+        # spread = q.ask_price - q.bid_price
+        # if spread <= 0.0:
+        #     # print(f"Retrieved 0 or negative spread for {t.symbol}")
+        #     return
+        #
+        # if q.symbol not in self.symbol_to_friction:
+        #     self.symbol_to_friction[q.symbol] = []
+        #
+        # ask_size = q.ask_size
+        # bid_size = q.bid_size
+        # friction = ((bid_size / (ask_size + bid_size)) - 0.5) * 2.0
+        #
+        # container = {'index': q.timestamp, 'friction': friction}
+        # self.symbol_to_friction[q.symbol].append(container)
+        #
+        # # Prune
+        # max_friction_length = 20000
+        # max_time_minutes = 3
+        # check_time_minutes = 4
+        # self.symbol_to_friction[q.symbol] = self.symbol_to_friction[q.symbol][-max_friction_length:]
+        #
+        # current_time = datetime.datetime.now(datetime.timezone.utc)
+        # max_time = current_time - datetime.timedelta(minutes=max_time_minutes)
+        # check_time = current_time - datetime.timedelta(minutes=check_time_minutes)
+        #
+        # if self.symbol_to_friction[q.symbol][0]['index'] < check_time:
+        #     print(f'Friction prune initiated for {q.symbol}...')
+        #     reduced_set = [r for r in self.symbol_to_friction[q.symbol] if r['index'] > max_time]
+        #     print(f'Friction prune results for {q.symbol}: {len(self.symbol_to_friction[q.symbol])} -> {len(reduced_set)}')
+        #     self.symbol_to_friction[q.symbol] = reduced_set
 
 
     async def trades_callback(self, t):
@@ -351,45 +356,45 @@ class BarManager:
             bars.loc[ts, 'volume'] = bars.loc[ts, 'volume'] + t.size
 
 
-        # Ticker momentum
-        latest_quote = self.get_latest_quote(t.symbol, t.timestamp)
-        if not latest_quote:
-            return
-
-        ask = latest_quote['ask_price']
-        bid = latest_quote['bid_price']
-        spread = ask - bid
-        midpoint = (ask + bid) / 2
-        fill = t.price
-
-        if spread <= 0.0:
-            # print(f"Retrieved 0 or negative spread for {t.symbol}")
-            return
-
-        burst = (fill - midpoint) / (spread / 2)
-        weighted_burst = t.size * burst
-
-        if t.symbol not in self.symbol_to_ticker_momentum:
-            self.symbol_to_ticker_momentum[t.symbol] = []
-
-        container = {'index': t.timestamp, 'oscillator': weighted_burst}
-        self.symbol_to_ticker_momentum[t.symbol].append(container)
-
-        # Prune
-        max_ticker_momentum_length = 20000
-        max_time_minutes = 3
-        check_time_minutes = 4
-        self.symbol_to_ticker_momentum[t.symbol] = self.symbol_to_ticker_momentum[t.symbol][-max_ticker_momentum_length:]
-
-        current_time = datetime.datetime.now(datetime.timezone.utc)
-        max_time = current_time - datetime.timedelta(minutes=max_time_minutes)
-        check_time = current_time - datetime.timedelta(minutes=check_time_minutes)
-
-        if self.symbol_to_ticker_momentum[t.symbol][0]['index'] < check_time:
-            print(f'Prune initiated for {t.symbol}...')
-            reduced_set = [r for r in self.symbol_to_ticker_momentum[t.symbol] if r['index'] > max_time]
-            print(f'Prune results for {t.symbol}: {len(self.symbol_to_ticker_momentum[t.symbol])} -> {len(reduced_set)}')
-            self.symbol_to_ticker_momentum[t.symbol] = reduced_set
+        # # Ticker momentum
+        # latest_quote = self.get_latest_quote(t.symbol, t.timestamp)
+        # if not latest_quote:
+        #     return
+        #
+        # ask = latest_quote['ask_price']
+        # bid = latest_quote['bid_price']
+        # spread = ask - bid
+        # midpoint = (ask + bid) / 2
+        # fill = t.price
+        #
+        # if spread <= 0.0:
+        #     # print(f"Retrieved 0 or negative spread for {t.symbol}")
+        #     return
+        #
+        # burst = (fill - midpoint) / (spread / 2)
+        # weighted_burst = t.size * burst
+        #
+        # if t.symbol not in self.symbol_to_ticker_momentum:
+        #     self.symbol_to_ticker_momentum[t.symbol] = []
+        #
+        # container = {'index': t.timestamp, 'oscillator': weighted_burst}
+        # self.symbol_to_ticker_momentum[t.symbol].append(container)
+        #
+        # # Prune
+        # max_ticker_momentum_length = 20000
+        # max_time_minutes = 3
+        # check_time_minutes = 4
+        # self.symbol_to_ticker_momentum[t.symbol] = self.symbol_to_ticker_momentum[t.symbol][-max_ticker_momentum_length:]
+        #
+        # current_time = datetime.datetime.now(datetime.timezone.utc)
+        # max_time = current_time - datetime.timedelta(minutes=max_time_minutes)
+        # check_time = current_time - datetime.timedelta(minutes=check_time_minutes)
+        #
+        # if self.symbol_to_ticker_momentum[t.symbol][0]['index'] < check_time:
+        #     print(f'Prune initiated for {t.symbol}...')
+        #     reduced_set = [r for r in self.symbol_to_ticker_momentum[t.symbol] if r['index'] > max_time]
+        #     print(f'Prune results for {t.symbol}: {len(self.symbol_to_ticker_momentum[t.symbol])} -> {len(reduced_set)}')
+        #     self.symbol_to_ticker_momentum[t.symbol] = reduced_set
 
 
     def set_get_time_override_function(self, get_time_override_function):

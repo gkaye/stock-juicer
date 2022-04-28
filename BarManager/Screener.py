@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 class Screener:
-    def __init__(self, api_key, api_secret, should_filter_by_spread=True):
+    def __init__(self, api_key, api_secret, should_filter_by_spread=True, mode='linearity'):
         self.symbol_to_bars = {}
         self.symbol_to_spreads = {}
         self.symbol_to_spread = {}
@@ -20,10 +20,23 @@ class Screener:
         self.output_symbols = []
         self.symbols_override = None
         self.time_override = None
+        self.linearity_ascending = False
         self.alpaca = alpaca_trade_api.REST(api_key, api_secret)
         self.should_filter_by_spread = should_filter_by_spread
-        self.pretty_output = pandas.DataFrame()
-        self.pretty_output_last_update_time = None
+        self.linearity_pretty_output = pandas.DataFrame()
+        self.linearity_pretty_output_last_update_time = None
+
+        self.u_pretty_output = pandas.DataFrame()
+        self.u_pretty_output_last_update_time = None
+        self.u_filter_low_dist_acr_max = 3.0
+        self.u_filter_high_dist_acr_max = 3.0
+        self.u_filter_linearity_min = 0.2
+
+        self.mode = mode
+
+    def set_mode(self, mode):
+        self.mode = mode
+        self.generate_symbols()
 
     def fetch_symbols(self):
         start = time.time()
@@ -138,6 +151,8 @@ class Screener:
 
         acr_period = 15
 
+        min_low_period = 100
+        high_max_period = 100
         min_volume_period = 15
 
         linearity_period = 40
@@ -146,6 +161,14 @@ class Screener:
         df[f'liquidity.{liquidity_dollars_risk}.{liquidity_acr_period}.{liquidity_volume_period}'] = (liquidity_dollars_risk / (((df['high'] - df['low']).rolling(window=liquidity_acr_period, min_periods=1).mean()) / 2)) / df['volume'].rolling(window=liquidity_volume_period, min_periods=1).mean()
 
         df[f'acr_MA.{acr_period}'] = (df['high'] - df['low']).rolling(window=acr_period, min_periods=1).mean()
+
+        df[f'low_MIN.{min_low_period}'] = df['low'].rolling(window=min_low_period, min_periods=1).min()
+        df[f'low_dist'] = df[f'low'] - df[f'low_MIN.{min_low_period}']
+        df[f'low_dist_acr'] = df[f'low_dist'] / df[f'acr_MA.{acr_period}']
+
+        df[f'high_MAX.{high_max_period}'] = df['high'].rolling(window=high_max_period, min_periods=1).max()
+        df[f'high_dist'] = df[f'high_MAX.{min_low_period}'] - df[f'high']
+        df[f'high_dist_acr'] = df[f'high_dist'] / df[f'acr_MA.{acr_period}']
 
         df[f'volume_MIN.{min_volume_period}'] = df['volume'].rolling(window=min_volume_period, min_periods=1).min()
 
@@ -190,8 +213,17 @@ class Screener:
 
     def generate_symbols(self):
         self.output_symbols.clear()
-        if not self.pretty_output.empty:
-            self.output_symbols.extend(self.pretty_output['symbol'].to_list())
+
+        if self.mode == 'linearity':
+            print('Mode set to linearity')
+            if not self.linearity_pretty_output.empty:
+                self.output_symbols.extend(self.linearity_pretty_output.to_dict('records'))
+        elif self.mode == 'u':
+            print('Mode set to u')
+            if not self.u_pretty_output.empty:
+                self.output_symbols.extend(self.u_pretty_output.to_dict('records'))
+        else:
+            print(f'Invalid mode: {self.mode}')
 
     def safe_get_symbol_to_spread(self, symbol):
         if symbol in self.symbol_to_spread:
@@ -203,7 +235,42 @@ class Screener:
             return self.symbol_to_spread_acr_ratio[symbol]
         return 0.0
 
-    def generate_pretty_output(self):
+    def flip_linearity_sort(self):
+        self.linearity_ascending = not self.linearity_ascending
+        print(f'Linearity flipped to {"ascending" if self.linearity_ascending else "descending"}')
+
+        self.generate_linearity_pretty_output()
+        self.generate_symbols()
+
+    def generate_linearity_pretty_output(self):
+        start = time.time()
+        prioritized_columns = ['symbol', 'linearity.40.6', 'liquidity.100.15.10', 'volume_MIN.15', 'spread_acr_ratio']
+
+        series_list = []
+        for symbol in self.active_symbols:
+            series = self.symbol_to_bars[symbol].iloc[-1].to_dict()
+            series['spread'] = self.safe_get_symbol_to_spread(symbol)
+            series['spread_acr_ratio'] = self.safe_get_symbol_to_spread_acr_ratio(symbol)
+            series_list.append(series)
+
+        df = pandas.DataFrame(series_list)
+
+        # Sort and prune
+        if df.empty:
+            print('No results found')
+        else:
+            df.sort_values(by=['linearity.40.6', 'liquidity.100.15.10', 'volume_MIN.15'], ascending=[self.linearity_ascending, True, False], inplace=True)
+
+            # Downselect and reorder columns
+            leftover_columns = [col for col in list(df.columns.values) if col not in prioritized_columns]
+            df = df[prioritized_columns + leftover_columns]
+
+        self.linearity_pretty_output = df
+        self.linearity_pretty_output_last_update_time = time.time()
+        print(f'generate_linearity_pretty_output() took {time.time() - start} seconds')
+
+    def generate_u_pretty_output(self):
+        start = time.time()
         prioritized_columns = ['symbol', 'linearity.40.6', 'liquidity.100.15.10', 'volume_MIN.15', 'spread_acr_ratio']
 
         series_list = []
@@ -220,14 +287,18 @@ class Screener:
             print('No results found')
         else:
             df.sort_values(by=['linearity.40.6', 'liquidity.100.15.10', 'volume_MIN.15'], ascending=[False, True, False], inplace=True)
-            df = df
 
             # Downselect and reorder columns
             leftover_columns = [col for col in list(df.columns.values) if col not in prioritized_columns]
             df = df[prioritized_columns + leftover_columns]
 
-        self.pretty_output = df
-        self.pretty_output_last_update_time = time.time()
+            # Filter
+            df = df[df['linearity.40.6'] >= self.u_filter_linearity_min]
+            df = df[(df['low_dist_acr'] <= self.u_filter_low_dist_acr_max) | (df['high_dist_acr'] <= self.u_filter_high_dist_acr_max)]
+
+        self.u_pretty_output = df
+        self.u_pretty_output_last_update_time = time.time()
+        print(f'generate_u_pretty_output() took {time.time() - start} seconds')
 
     def initialize(self):
         initial_candles = 50
@@ -257,7 +328,8 @@ class Screener:
         if self.should_filter_by_spread:
             self.fetch_spread()
             self.filter_by_spread()
-        self.generate_pretty_output()
+        self.generate_linearity_pretty_output()
+        self.generate_u_pretty_output()
         self.generate_symbols()
         end = time.time()
 
