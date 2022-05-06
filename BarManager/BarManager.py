@@ -2,6 +2,8 @@ import datetime
 import math
 import threading
 import time
+from concurrent.futures.process import ProcessPoolExecutor
+
 import alpaca_trade_api
 import pandas
 from alpaca_trade_api import Stream
@@ -9,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 class BarManager:
-    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=15, data_feed='sip', max_bars=100, aggregation_period_minutes=1, pinned_symbols=[],
+    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=0, data_feed='sip', max_bars=100, aggregation_period_minutes=2, pinned_symbols=[],
                  rvol_sample_window_seconds=50, rvol_multiplier=1):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -33,7 +35,6 @@ class BarManager:
 
         self.alpaca = alpaca_trade_api.REST(api_key, api_secret)
         self.stream = Stream(api_key, api_secret, data_feed=data_feed)
-
 
     def reset_subgraphs(self):
         self.symbol_to_ticker_momentum = {}
@@ -152,18 +153,19 @@ class BarManager:
     def generate_subscription_symbols(self):
         unpinned_symbols_subset = [x['symbol'] for x in self.symbols if x['symbol'] not in self.pinned_symbols]
         self.subscription_symbols = (self.pinned_symbols + unpinned_symbols_subset)[:(self.num_active_charts + self.symbols_buffer)]
-        print(f'Subscribing to symbols: {self.subscription_symbols}')
+
+        print(f'Subscription symbols: {self.subscription_symbols}')
 
 
-    def subscriptions_out_of_sync(self):
-        active_symbols = self.get_active_symbols()
-        subscription_symbols = self.subscription_symbols
-        for symbol in active_symbols:
-            if symbol not in self.subscription_symbols:
-                print(f'Active symbols out of sync, missing {symbol}')
-                print(f'Active:               {active_symbols}')
-                print(f'Currently Subscribed: {subscription_symbols}')
-                return True
+    # def subscriptions_out_of_sync(self):
+    #     active_symbols = self.get_active_symbols()
+    #     subscription_symbols = self.subscription_symbols
+    #     for symbol in active_symbols:
+    #         if symbol not in self.subscription_symbols:
+    #             print(f'Active symbols out of sync, missing {symbol}')
+    #             print(f'Active:                             {active_symbols}')
+    #             print(f'Currently Subscribed:               {subscription_symbols}')
+    #             return True
 
 
     def prune_dead_symbols(self):
@@ -173,19 +175,11 @@ class BarManager:
             self.symbol_to_trade_timestamps.pop(symbol, None)
 
 
-    def maybe_reinitialize_job(self):
-        stream_stop_wait_time = 0.1
-        if not self.subscriptions_out_of_sync():
-            return
-
-        self.stream.stop()
-
-        if self.stream_thread is not None:
-            while self.stream_thread.is_alive():
-                print(f'Stream thread still alive, waiting {stream_stop_wait_time} seconds for termination...')
-                time.sleep(stream_stop_wait_time)
-
-        self.update_stream()
+    # def maybe_reinitialize_job(self):
+    #     if not self.subscriptions_out_of_sync():
+    #         return
+    #
+    #     self.update_stream()
 
 
     def get_offset_time(self, offset_minutes):
@@ -216,18 +210,43 @@ class BarManager:
 
         self.update_stream()
         scheduler = BackgroundScheduler()
-        scheduler.add_job(self.maybe_reinitialize_job, 'interval', seconds=15)
+        scheduler.add_job(self.update_stream, 'interval', seconds=5)
         scheduler.start()
 
 
     def update_stream(self):
+        old_subscription_symbols = self.subscription_symbols
         self.generate_subscription_symbols()
         self.prune_dead_symbols()
-        self.stream.subscribe_trades(self.trades_callback, *self.subscription_symbols)
-        self.stream.subscribe_quotes(self.quotes_callback, *self.subscription_symbols)
 
-        self.stream_thread = threading.Thread(target=lambda: self.stream.run())
-        self.stream_thread.start()
+
+        symbols_to_add = []
+        for symbol in self.subscription_symbols:
+            if symbol not in old_subscription_symbols:
+                symbols_to_add.append(symbol)
+
+        print(f'Adding symbols:   {symbols_to_add}')
+
+
+        symbols_to_remove = []
+        for symbol in old_subscription_symbols:
+            if symbol not in self.subscription_symbols:
+                symbols_to_remove.append(symbol)
+
+        print(f'Removing symbols: {symbols_to_remove}')
+
+
+        if self.stream_thread is not None and len(symbols_to_remove) > 0:
+            self.stream.unsubscribe_trades(*symbols_to_remove)
+            self.stream.unsubscribe_quotes(*symbols_to_remove)
+
+        if len(symbols_to_add) > 0:
+            self.stream.subscribe_trades(self.trades_callback, *symbols_to_add)
+            self.stream.subscribe_quotes(self.quotes_callback, *symbols_to_add)
+
+        if self.stream_thread is None:
+            self.stream_thread = threading.Thread(target=lambda: self.stream.run())
+            self.stream_thread.start()
 
 
     def initialize_historical_bars(self, symbol):

@@ -19,7 +19,7 @@ app.config.suppress_callback_exceptions = True
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
 graph_style = {"height": "320px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-ttl_live_charts = 30
+ttl_live_charts = 15
 
 
 def create_graph(i):
@@ -139,15 +139,23 @@ def flip_button(n_clicks):
 def render_content(tab):
     if tab == 'u-graph-tab':
         screener.set_mode('u')
+        if bar_manager is not None:
+            bar_manager.update_stream()
         return u_graphs_layout
     elif tab == 'u-table-tab':
         screener.set_mode('u')
+        if bar_manager is not None:
+            bar_manager.update_stream()
         return u_table_layout
     elif tab == 'linearity-graph-tab':
         screener.set_mode('linearity')
+        if bar_manager is not None:
+            bar_manager.update_stream()
         return linearity_graphs_layout
     elif tab == 'linearity-table-tab':
         screener.set_mode('linearity')
+        if bar_manager is not None:
+            bar_manager.update_stream()
         return linearity_table_layout
 
 
