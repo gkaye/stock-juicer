@@ -1,5 +1,4 @@
 import math
-import random
 import time
 
 from dash import Dash, dash_table, dcc, html, Output, Input
@@ -261,7 +260,7 @@ def update_symbol(n_intervals):
     ret = []
     if bar_manager is not None:
         for symbol in bar_manager.get_active_symbols():
-            if bar_manager.get_metadata(symbol):
+            if bar_manager.get_metadata(symbol) and not math.isnan(bar_manager.get_metadata(symbol)['linearity.40.6']):
                 linearity = math.floor(bar_manager.get_metadata(symbol)['linearity.40.6'] * 100)
             else:
                 linearity = -1

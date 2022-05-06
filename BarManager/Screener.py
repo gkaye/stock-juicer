@@ -6,6 +6,7 @@ import dateutil
 import alpaca_trade_api
 import numpy
 import pandas
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -28,8 +29,8 @@ class Screener:
 
         self.u_pretty_output = pandas.DataFrame()
         self.u_pretty_output_last_update_time = None
-        self.u_filter_low_dist_acr_max = 3.0
-        self.u_filter_high_dist_acr_max = 3.0
+        self.u_filter_low_dist_acr_max = 4.0
+        self.u_filter_high_dist_acr_max = 4.0
         self.u_filter_linearity_min = 0.2
 
         self.mode = mode

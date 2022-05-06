@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 class BarManager:
-    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=15, data_feed='sip', max_bars=100, aggregation_period_minutes=2, pinned_symbols=[],
+    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=15, data_feed='sip', max_bars=100, aggregation_period_minutes=1, pinned_symbols=[],
                  rvol_sample_window_seconds=50, rvol_multiplier=1):
         self.api_key = api_key
         self.api_secret = api_secret
