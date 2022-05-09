@@ -19,7 +19,7 @@ app.config.suppress_callback_exceptions = True
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
 graph_style = {"height": "320px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-ttl_live_charts = 15
+ttl_live_charts = 30
 
 
 def create_graph(i):
@@ -52,7 +52,7 @@ u_graphs_layout = html.Div([
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
-        interval=400,
+        interval=1000,
         n_intervals=0
     ),
     dcc.Interval(
@@ -67,7 +67,7 @@ linearity_graphs_layout = html.Div([
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
-        interval=400,
+        interval=1000,
         n_intervals=0
     ),
     dcc.Interval(

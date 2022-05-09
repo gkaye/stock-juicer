@@ -11,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 class BarManager:
-    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=0, data_feed='sip', max_bars=100, aggregation_period_minutes=2, pinned_symbols=[],
+    def __init__(self, api_key, api_secret, num_active_charts=15, symbols_buffer=0, data_feed='sip', max_bars=100, aggregation_period_minutes=1, pinned_symbols=[],
                  rvol_sample_window_seconds=50, rvol_multiplier=1):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -151,10 +151,12 @@ class BarManager:
 
 
     def generate_subscription_symbols(self):
+        old_subscription_symbols = self.subscription_symbols
         unpinned_symbols_subset = [x['symbol'] for x in self.symbols if x['symbol'] not in self.pinned_symbols]
         self.subscription_symbols = (self.pinned_symbols + unpinned_symbols_subset)[:(self.num_active_charts + self.symbols_buffer)]
 
-        print(f'Subscription symbols: {self.subscription_symbols}')
+        if set(old_subscription_symbols) != set(self.subscription_symbols):
+            print(f'Subscription symbols: {self.subscription_symbols}')
 
 
     # def subscriptions_out_of_sync(self):
@@ -225,7 +227,8 @@ class BarManager:
             if symbol not in old_subscription_symbols:
                 symbols_to_add.append(symbol)
 
-        print(f'Adding symbols:   {symbols_to_add}')
+        if len(symbols_to_add) > 0:
+            print(f'Adding symbols:   {symbols_to_add}')
 
 
         symbols_to_remove = []
@@ -233,7 +236,8 @@ class BarManager:
             if symbol not in self.subscription_symbols:
                 symbols_to_remove.append(symbol)
 
-        print(f'Removing symbols: {symbols_to_remove}')
+        if len(symbols_to_remove) > 0:
+            print(f'Removing symbols: {symbols_to_remove}')
 
 
         if self.stream_thread is not None and len(symbols_to_remove) > 0:
