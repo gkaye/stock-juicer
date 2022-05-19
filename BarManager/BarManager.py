@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import math
 import threading
@@ -8,6 +9,7 @@ import alpaca_trade_api
 import pandas
 from alpaca_trade_api import Stream
 from apscheduler.schedulers.background import BackgroundScheduler
+from tornado.platform.asyncio import AnyThreadEventLoopPolicy
 
 
 class BarManager:
@@ -239,18 +241,19 @@ class BarManager:
         if len(symbols_to_remove) > 0:
             print(f'Removing symbols: {symbols_to_remove}')
 
+        if self.stream_thread is None:
+            asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
+
+            self.stream_thread = threading.Thread(target=lambda: self.stream.run())
+            self.stream_thread.start()
 
         if self.stream_thread is not None and len(symbols_to_remove) > 0:
             self.stream.unsubscribe_trades(*symbols_to_remove)
             self.stream.unsubscribe_quotes(*symbols_to_remove)
 
-        if len(symbols_to_add) > 0:
+        if self.stream_thread is not None and len(symbols_to_add) > 0:
             self.stream.subscribe_trades(self.trades_callback, *symbols_to_add)
             self.stream.subscribe_quotes(self.quotes_callback, *symbols_to_add)
-
-        if self.stream_thread is None:
-            self.stream_thread = threading.Thread(target=lambda: self.stream.run())
-            self.stream_thread.start()
 
 
     def initialize_historical_bars(self, symbol):

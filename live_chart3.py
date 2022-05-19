@@ -341,7 +341,7 @@ def update_graph(n_intervals):
 
 if __name__ == '__main__':
     historical_mode = False
-    historical_time = "2022-04-27T15:45:00+00:00"
+    historical_time = "2022-05-09T18:30:00+00:00"
 
     bar_manager = None
     threading.Thread(target=lambda: app.run_server(debug=True, use_reloader=False)).start()
