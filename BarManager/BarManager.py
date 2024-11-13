@@ -3,7 +3,6 @@ import datetime
 import math
 import threading
 import time
-from concurrent.futures.process import ProcessPoolExecutor
 
 import alpaca_trade_api
 import pandas
@@ -161,29 +160,11 @@ class BarManager:
             print(f'Subscription symbols: {self.subscription_symbols}')
 
 
-    # def subscriptions_out_of_sync(self):
-    #     active_symbols = self.get_active_symbols()
-    #     subscription_symbols = self.subscription_symbols
-    #     for symbol in active_symbols:
-    #         if symbol not in self.subscription_symbols:
-    #             print(f'Active symbols out of sync, missing {symbol}')
-    #             print(f'Active:                             {active_symbols}')
-    #             print(f'Currently Subscribed:               {subscription_symbols}')
-    #             return True
-
-
     def prune_dead_symbols(self):
         symbols_for_deletion = [symbol for symbol in self.symbol_to_bars if symbol not in self.subscription_symbols]
         for symbol in symbols_for_deletion:
             self.symbol_to_bars.pop(symbol, None)
             self.symbol_to_trade_timestamps.pop(symbol, None)
-
-
-    # def maybe_reinitialize_job(self):
-    #     if not self.subscriptions_out_of_sync():
-    #         return
-    #
-    #     self.update_stream()
 
 
     def get_offset_time(self, offset_minutes):
@@ -310,39 +291,6 @@ class BarManager:
         self.symbol_to_quotes[q.symbol] = self.symbol_to_quotes[q.symbol][-max_quotes:]
 
 
-        # # Friction
-        # spread = q.ask_price - q.bid_price
-        # if spread <= 0.0:
-        #     # print(f"Retrieved 0 or negative spread for {t.symbol}")
-        #     return
-        #
-        # if q.symbol not in self.symbol_to_friction:
-        #     self.symbol_to_friction[q.symbol] = []
-        #
-        # ask_size = q.ask_size
-        # bid_size = q.bid_size
-        # friction = ((bid_size / (ask_size + bid_size)) - 0.5) * 2.0
-        #
-        # container = {'index': q.timestamp, 'friction': friction}
-        # self.symbol_to_friction[q.symbol].append(container)
-        #
-        # # Prune
-        # max_friction_length = 20000
-        # max_time_minutes = 3
-        # check_time_minutes = 4
-        # self.symbol_to_friction[q.symbol] = self.symbol_to_friction[q.symbol][-max_friction_length:]
-        #
-        # current_time = datetime.datetime.now(datetime.timezone.utc)
-        # max_time = current_time - datetime.timedelta(minutes=max_time_minutes)
-        # check_time = current_time - datetime.timedelta(minutes=check_time_minutes)
-        #
-        # if self.symbol_to_friction[q.symbol][0]['index'] < check_time:
-        #     print(f'Friction prune initiated for {q.symbol}...')
-        #     reduced_set = [r for r in self.symbol_to_friction[q.symbol] if r['index'] > max_time]
-        #     print(f'Friction prune results for {q.symbol}: {len(self.symbol_to_friction[q.symbol])} -> {len(reduced_set)}')
-        #     self.symbol_to_friction[q.symbol] = reduced_set
-
-
     async def trades_callback(self, t):
         # Manage symbol_to_trade_timestamps
         if t.symbol not in self.symbol_to_trade_timestamps:
@@ -381,47 +329,6 @@ class BarManager:
                 bars.loc[ts, 'low'] = t.price
             bars.loc[ts, 'close'] = t.price
             bars.loc[ts, 'volume'] = bars.loc[ts, 'volume'] + t.size
-
-
-        # # Ticker momentum
-        # latest_quote = self.get_latest_quote(t.symbol, t.timestamp)
-        # if not latest_quote:
-        #     return
-        #
-        # ask = latest_quote['ask_price']
-        # bid = latest_quote['bid_price']
-        # spread = ask - bid
-        # midpoint = (ask + bid) / 2
-        # fill = t.price
-        #
-        # if spread <= 0.0:
-        #     # print(f"Retrieved 0 or negative spread for {t.symbol}")
-        #     return
-        #
-        # burst = (fill - midpoint) / (spread / 2)
-        # weighted_burst = t.size * burst
-        #
-        # if t.symbol not in self.symbol_to_ticker_momentum:
-        #     self.symbol_to_ticker_momentum[t.symbol] = []
-        #
-        # container = {'index': t.timestamp, 'oscillator': weighted_burst}
-        # self.symbol_to_ticker_momentum[t.symbol].append(container)
-        #
-        # # Prune
-        # max_ticker_momentum_length = 20000
-        # max_time_minutes = 3
-        # check_time_minutes = 4
-        # self.symbol_to_ticker_momentum[t.symbol] = self.symbol_to_ticker_momentum[t.symbol][-max_ticker_momentum_length:]
-        #
-        # current_time = datetime.datetime.now(datetime.timezone.utc)
-        # max_time = current_time - datetime.timedelta(minutes=max_time_minutes)
-        # check_time = current_time - datetime.timedelta(minutes=check_time_minutes)
-        #
-        # if self.symbol_to_ticker_momentum[t.symbol][0]['index'] < check_time:
-        #     print(f'Prune initiated for {t.symbol}...')
-        #     reduced_set = [r for r in self.symbol_to_ticker_momentum[t.symbol] if r['index'] > max_time]
-        #     print(f'Prune results for {t.symbol}: {len(self.symbol_to_ticker_momentum[t.symbol])} -> {len(reduced_set)}')
-        #     self.symbol_to_ticker_momentum[t.symbol] = reduced_set
 
 
     def set_get_time_override_function(self, get_time_override_function):
