@@ -1,6 +1,5 @@
-import random
+import math
 import time
-import datetime
 
 from dash import Dash, dash_table, dcc, html, Output, Input
 import threading
@@ -11,9 +10,8 @@ import dash
 import dash_daq as daq
 
 
-
 API_KEY = '<API_KEY>'
-SECRET_KEY = '<API_SECRET>'
+SECRET_KEY = '<SECRET_KEY>'
 
 app = Dash(__name__, title='Juicer', update_title=None)
 app.config.suppress_callback_exceptions = True
@@ -21,13 +19,7 @@ app.config.suppress_callback_exceptions = True
 graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
 graph_style = {"height": "320px", 'minWidth': '425px', 'maxWidth': '600px'}
 
-sub_graph_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
-sub_graph_style = {"height": "75px", 'minWidth': '425px', 'maxWidth': '600px'}
-
-sub_graph_2_config = {'staticPlot': True, 'displaylogo': False, 'frameMargins': 0.0, 'autosizable': False, 'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}
-sub_graph_2_style = {"height": "75px", 'minWidth': '425px', 'maxWidth': '600px'}
-
-ttl_live_charts = 10
+ttl_live_charts = 30
 
 
 def create_graph(i):
@@ -35,11 +27,10 @@ def create_graph(i):
         [
             html.Div([
                 html.H6('Symbol', id=f'symbol_{i}'),
+                html.H6('Linearity', id=f'linearity_{i}'),
                 html.H6('📌', id=f'pin-button_{i}', n_clicks=0, style={'cursor': 'pointer'})
             ], style={'display': 'inline-flex', 'justifyContent': 'space-between', 'alignItems': 'flex-end', 'margin': '3px 7px -4px 7px'}),
             html.Div(dcc.Graph(id=f'graph_{i}', responsive=True, config=graph_config, style=graph_style), style={}),
-            html.Div(dcc.Graph(id=f'sub_graph_{i}', responsive=True, config=sub_graph_config, style=sub_graph_style), style={'border-top': '2px solid black'}),
-            html.Div(dcc.Graph(id=f'sub_graph_2_{i}', responsive=True, config=sub_graph_2_config, style=sub_graph_2_style), style={'border-top': '2px solid black'}),
             html.Div(daq.GraduatedBar(
                 id=f'volume-acceleration_{i}',
                 className='rvol_bar',
@@ -57,16 +48,11 @@ def create_graphs(n):
     return [create_graph(i) for i in range(n)]
 
 
-graphs_layout = html.Div([
+u_graphs_layout = html.Div([
     *create_graphs(ttl_live_charts),
     dcc.Interval(
         id='chart-interval-component',
         interval=1000,
-        n_intervals=0
-    ),
-    dcc.Interval(
-        id='sub-chart-interval-component',
-        interval=2500,
         n_intervals=0
     ),
     dcc.Interval(
@@ -76,77 +62,151 @@ graphs_layout = html.Div([
     ),
 ], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
 
-raw_layout = html.Div([
-    html.Button('Reset', id='reset-button', n_clicks=0),
-    html.Div(id='dummy'),
-    html.H5(id='screener-info-text-1'),
-    html.H5(id='screener-info-text-2'),
-    dash_table.DataTable(id='screener-table'),
+
+linearity_graphs_layout = html.Div([
+    *create_graphs(ttl_live_charts),
     dcc.Interval(
-        id='screener-table-interval-component',
+        id='chart-interval-component',
+        interval=1000,
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id='pin-interval-component',
+        interval=1000,
+        n_intervals=0
+    ),
+], style={'overflow-y': 'hidden', 'overflow-x': 'hidden', 'textAlign': 'center'})
+
+linearity_table_layout = html.Div([
+    html.Button('Flip', id='flip-button', n_clicks=0),
+    html.Div(id='dummy'),
+    html.H5(id='linearity-screener-info-text-1'),
+    html.H5(id='linearity-screener-info-text-2'),
+    dash_table.DataTable(id='linearity-screener-table'),
+    dcc.Interval(
+        id='linearity-screener-table-interval-component',
         interval=1 * 1000,
         n_intervals=0
     ),
     dcc.Interval(
-        id='screener-info-text-interval-component',
+        id='linearity-screener-info-text-interval-component',
         interval=1 * 1000,
         n_intervals=0
     )
 ], style={'padding': '10px'})
 
-
+u_table_layout = html.Div([
+    html.H5(id='u-screener-info-text-1'),
+    html.H5(id='u-screener-info-text-2'),
+    dash_table.DataTable(id='u-screener-table'),
+    dcc.Interval(
+        id='u-screener-table-interval-component',
+        interval=1 * 1000,
+        n_intervals=0
+    ),
+    dcc.Interval(
+        id='u-screener-info-text-interval-component',
+        interval=1 * 1000,
+        n_intervals=0
+    )
+], style={'padding': '10px'})
 
 app.layout = html.Div([
-    dcc.Tabs(id="tabs", value='tab-2', children=[
-        dcc.Tab(label='Graphs', value='tab-1'),
-        dcc.Tab(label='Raw Output', value='tab-2'),
+    dcc.Tabs(id="tabs", value='linearity-table-tab', children=[
+        dcc.Tab(label='U Graphs', value='u-graph-tab'),
+        dcc.Tab(label='Linearity Graphs', value='linearity-graph-tab'),
+        dcc.Tab(label='U Table', value='u-table-tab'),
+        dcc.Tab(label='Linearity Table', value='linearity-table-tab'),
     ]),
-    html.Div(id='tabs-content-example-graph'),
+    html.Div(id='tabs-content-example-graph')
 ])
 
 
 @app.callback(
     Output('dummy', 'children'),
-    Input('reset-button', 'n_clicks'),
+    Input('flip-button', 'n_clicks'),
+    prevent_initial_call=True
 )
-def reset_button(n_clicks):
-    if bar_manager:
-        bar_manager.reset_subgraphs()
+def flip_button(n_clicks):
+    if n_clicks > 0 and screener:
+        screener.flip_linearity_sort()
+
     return ""
 
 
 @app.callback(Output('tabs-content-example-graph', 'children'),
               Input('tabs', 'value'))
 def render_content(tab):
-    if tab == 'tab-1':
-        return graphs_layout
-    elif tab == 'tab-2':
-        return raw_layout
+    if tab == 'u-graph-tab':
+        screener.set_mode('u')
+        if bar_manager is not None:
+            bar_manager.update_stream()
+        return u_graphs_layout
+    elif tab == 'u-table-tab':
+        screener.set_mode('u')
+        if bar_manager is not None:
+            bar_manager.update_stream()
+        return u_table_layout
+    elif tab == 'linearity-graph-tab':
+        screener.set_mode('linearity')
+        if bar_manager is not None:
+            bar_manager.update_stream()
+        return linearity_graphs_layout
+    elif tab == 'linearity-table-tab':
+        screener.set_mode('linearity')
+        if bar_manager is not None:
+            bar_manager.update_stream()
+        return linearity_table_layout
 
 
-@app.callback(Output('screener-table', 'data'),
-              Output('screener-table', 'columns'),
-              Input('screener-table-interval-component', 'n_intervals'))
+@app.callback(Output('linearity-screener-table', 'data'),
+              Output('linearity-screener-table', 'columns'),
+              Input('linearity-screener-table-interval-component', 'n_intervals'))
 def update_metrics(n):
-    return screener.pretty_output.to_dict('records'), [{"name": i, "id": i} for i in screener.pretty_output.columns]
+    return screener.linearity_pretty_output.to_dict('records'), [{"name": i, "id": i} for i in screener.linearity_pretty_output.columns]
 
 
-@app.callback(Output('screener-info-text-1', 'children'),
-              Input('screener-info-text-interval-component', 'n_intervals'))
+@app.callback(Output('linearity-screener-info-text-1', 'children'),
+              Input('linearity-screener-info-text-interval-component', 'n_intervals'))
 def update_metrics(n):
-    last_update_time = screener.pretty_output_last_update_time
+    last_update_time = screener.linearity_pretty_output_last_update_time
     if not last_update_time:
         elapsed_string = 'Never updated'
     else:
-        elapsed_string = f'{(time.time() - screener.pretty_output_last_update_time):.0f} seconds ago'
+        elapsed_string = f'{(time.time() - screener.linearity_pretty_output_last_update_time):.0f} seconds ago'
 
     return f'Last update time: {elapsed_string}'
 
 
-@app.callback(Output('screener-info-text-2', 'children'),
-              Input('screener-info-text-interval-component', 'n_intervals'))
+@app.callback(Output('linearity-screener-info-text-2', 'children'),
+              Input('linearity-screener-info-text-interval-component', 'n_intervals'))
 def update_metrics(n):
-    return f'Number of Records: {screener.pretty_output.shape[0]}'
+    return f'Number of Records: {screener.linearity_pretty_output.shape[0]}'
+
+
+@app.callback(Output('u-screener-table', 'data'),
+              Output('u-screener-table', 'columns'),
+              Input('u-screener-table-interval-component', 'n_intervals'))
+def update_metrics(n):
+    return screener.u_pretty_output.to_dict('records'), [{"name": i, "id": i} for i in screener.u_pretty_output.columns]
+
+
+@app.callback(Output('u-screener-info-text-1', 'children'),
+              Input('u-screener-info-text-interval-component', 'n_intervals'))
+def update_metrics(n):
+    last_update_time = screener.u_pretty_output_last_update_time
+    if not last_update_time:
+        elapsed_string = 'Never updated'
+    else:
+        elapsed_string = f'{(time.time() - screener.u_pretty_output_last_update_time):.0f} seconds ago'
+
+    return f'Last update time: {elapsed_string}'
+
+
+@app.callback(Output('u-screener-info-text-2', 'children'),
+              Input('u-screener-info-text-interval-component', 'n_intervals'))
+def update_metrics(n):
+    return f'Number of Records: {screener.u_pretty_output.shape[0]}'
 
 
 @app.callback([Output(f'pin-button_{i}', 'children') for i in range(ttl_live_charts)],
@@ -198,6 +258,24 @@ def update_symbol(n_intervals):
 
     while len(ret) < ttl_live_charts:
         ret.append('Symbol')
+
+    return ret
+
+
+@app.callback([Output(f'linearity_{i}', 'children') for i in range(ttl_live_charts)],
+              [Input('chart-interval-component', 'n_intervals')])
+def update_symbol(n_intervals):
+    ret = []
+    if bar_manager is not None:
+        for symbol in bar_manager.get_active_symbols():
+            if bar_manager.get_metadata(symbol) and not math.isnan(bar_manager.get_metadata(symbol)['linearity.40.6']):
+                linearity = math.floor(bar_manager.get_metadata(symbol)['linearity.40.6'] * 100)
+            else:
+                linearity = -1
+            ret.append(linearity)
+
+    while len(ret) < ttl_live_charts:
+        ret.append('Linearity')
 
     return ret
 
@@ -261,107 +339,9 @@ def update_graph(n_intervals):
     return ret
 
 
-@app.callback([Output(f'sub_graph_{i}', 'figure') for i in range(ttl_live_charts)],
-              [Input('sub-chart-interval-component', 'n_intervals')])
-def update_sub_graph(n_intervals):
-    start_time = time.time()
-
-    sub_graph_window_minutes = 3
-    ret = []
-    if bar_manager is not None:
-        for symbol in bar_manager.get_active_symbols():
-            dataframe = bar_manager.get_ticker_momentum(symbol)
-
-            ret.append({
-                'data': [{
-                    'x': dataframe.index,
-                    'y': dataframe['oscillator_ratio'],
-                    'type': 'scatter'
-                }],
-                'layout': {
-                    'showlegend': False,
-                    'margin': {'l': 5, 'r': 50, 't': 0, 'b': 0},
-                    'xaxis': {'rangeslider': {'visible': False}, 'zeroline': False, 'visible': False, 'range': [dataframe.tail(1).index[0] - datetime.timedelta(minutes=sub_graph_window_minutes), dataframe.tail(1).index[0]]},
-                    'yaxis': {'side': 'right', 'range': [-1.05, 1.05]},
-                    'template': 'plotly_dark'
-                }
-            })
-
-    while len(ret) < ttl_live_charts:
-        ret.append({
-            'data': [{
-                'open': [],
-                'high': [],
-                'low': [],
-                'close': [],
-                'type': 'candlestick'
-            }],
-            'layout': {
-                'title': {'text': f'', 'x': .05},
-                'showlegend': False,
-                'margin': {'l': 5, 'r': 50, 't': 50, 'b': 25},
-                'xaxis': {'rangeslider': {'visible': False}, 'zeroline': False, 'visible': False},
-                'yaxis': {'side': 'right'},
-            }
-        })
-
-    print(f'{(time.time() - start_time):.4f} seconds elapsed processing all momentum sub graphs.')
-
-    return ret
-
-
-@app.callback([Output(f'sub_graph_2_{i}', 'figure') for i in range(ttl_live_charts)],
-              [Input('sub-chart-interval-component', 'n_intervals')])
-def update_sub_graph_2(n_intervals):
-    start_time = time.time()
-
-    sub_graph_window_minutes = 3
-    ret = []
-    if bar_manager is not None:
-        for symbol in bar_manager.get_active_symbols():
-            dataframe = bar_manager.get_friction(symbol)
-
-            ret.append({
-                'data': [{
-                    'x': dataframe.index,
-                    'y': dataframe['friction_ma'],
-                    'type': 'scatter'
-                }],
-                'layout': {
-                    'showlegend': False,
-                    'margin': {'l': 5, 'r': 50, 't': 0, 'b': 0},
-                    'xaxis': {'rangeslider': {'visible': False}, 'zeroline': False, 'visible': False, 'range': [dataframe.tail(1).index[0] - datetime.timedelta(minutes=sub_graph_window_minutes), dataframe.tail(1).index[0]]},
-                    'yaxis': {'side': 'right', 'range': [-1.05, 1.05]},
-                    'template': 'plotly_dark'
-                }
-            })
-
-    while len(ret) < ttl_live_charts:
-        ret.append({
-            'data': [{
-                'open': [],
-                'high': [],
-                'low': [],
-                'close': [],
-                'type': 'candlestick'
-            }],
-            'layout': {
-                'title': {'text': f'', 'x': .05},
-                'showlegend': False,
-                'margin': {'l': 5, 'r': 50, 't': 50, 'b': 25},
-                'xaxis': {'rangeslider': {'visible': False}, 'zeroline': False, 'visible': False},
-                'yaxis': {'side': 'right'},
-            }
-        })
-
-    print(f'{(time.time() - start_time):.4f} seconds elapsed processing all friction sub graphs.')
-
-    return ret
-
-
 if __name__ == '__main__':
     historical_mode = False
-    historical_time = "2022-04-08T19:00:00+00:00"
+    historical_time = "2022-05-09T18:30:00+00:00"
 
     bar_manager = None
     threading.Thread(target=lambda: app.run_server(debug=True, use_reloader=False)).start()
@@ -371,7 +351,7 @@ if __name__ == '__main__':
         screener.set_time_override(historical_time)
     screener.initialize()
 
-    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY'], num_active_charts=ttl_live_charts, aggregation_period_minutes=1)
+    bar_manager = BarManager(API_KEY, SECRET_KEY, pinned_symbols=['SPY', 'QQQ'], num_active_charts=ttl_live_charts)
     bar_manager.set_symbols(screener.output_symbols)
     if historical_mode:
         bar_manager.set_get_time_override_function(lambda: screener.time_override)
